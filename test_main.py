@@ -1,5 +1,6 @@
 import pytest
-from httpx import AsyncClient, ASGITransport  # Добавили импорт ASGITransport
+from httpx import ASGITransport, AsyncClient  # Добавили импорт ASGITransport
+
 from main import app
 
 pytestmark = pytest.mark.asyncio
@@ -15,7 +16,7 @@ async def test_create_recipe():
         "title": "Тестовый пирог",
         "cooking_time": 45,
         "ingredients": "Мука, сахар, яблоки",
-        "description": "Смешать и запекать 45 минут."
+        "description": "Смешать и запекать 45 минут.",
     }
 
     # Вместо app=app передаем transport=transport
@@ -35,7 +36,7 @@ async def test_get_recipe_detail_and_increment_views():
         "title": "Суп тестовый",
         "cooking_time": 20,
         "ingredients": "Вода, соль",
-        "description": "Вскипятить воду, посолить."
+        "description": "Вскипятить воду, посолить.",
     }
 
     # И здесь тоже меняем на transport=transport
