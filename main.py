@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, List, Sequence
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy import asc, desc
@@ -16,25 +16,20 @@ app = FastAPI(
 )
 
 
-# Автоматическое создание таблиц при старте приложения
 @app.on_event("startup")
-async def startup():
+async def startup() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(models.Base.metadata.create_all)
 
 
-# 1. GET /recipes — Получить список всех рецептов (с сортировкой)
 @app.get(
     "/recipes",
     response_model=List[schemas.RecipeListOut],
     status_code=status.HTTP_200_OK,
 )
-async def get_recipes(db: AsyncSession = Depends(get_db)):
-    """
-    Возвращает список всех рецептов, отсортированных по популярности
-    (количество просмотров - убывание), затем по времени готовки (возрастание).
-    """
-    # Пишем сортировку строго по ТЗ
+async def get_recipes(
+    db: AsyncSession = Depends(get_db),
+) -> Sequence[Any]:
     query = select(models.Recipe).order_by(
         desc(models.Recipe.views), asc(models.Recipe.cooking_time)
     )
@@ -42,17 +37,12 @@ async def get_recipes(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
-# 2. GET /recipes/{recipe_id} — Получить детальную информацию о рецепте (+1 к просмотру)
 @app.get(
     "/recipes/{recipe_id}",
     response_model=schemas.RecipeDetailOut,
     status_code=status.HTTP_200_OK,
 )
-async def get_recipe_detail(recipe_id: int, db: AsyncSession = Depends(get_db)):
-    """
-    Возвращает детальную информацию о конкретном рецепте.
-    Каждое открытие увеличивает счетчик просмотров на 1.
-    """
+async def get_recipe_detail(recipe_id: int, db: AsyncSession = Depends(get_db)) -> Any:
     result = await db.execute(
         select(models.Recipe).where(models.Recipe.id == recipe_id)
     )
@@ -64,15 +54,16 @@ async def get_recipe_detail(recipe_id: int, db: AsyncSession = Depends(get_db)):
             detail=f"Рецепт с id {recipe_id} не найден",
         )
 
-    # Инкрементируем просмотры
-    recipe.views += 1
-    await db.commit()  # Сохраняем изменения в базе
-    await db.refresh(recipe)  # Обновляем объект актуальными данными из БД
+    # Используем setattr, чтобы mypy не ругался на несовместимость Column и int
+    current_views = int(recipe.views)
+    setattr(recipe, "views", current_views + 1)
+
+    await db.commit()
+    await db.refresh(recipe)
 
     return recipe
 
 
-# 3. POST /recipes — Создать новый рецепт
 @app.post(
     "/recipes",
     response_model=schemas.RecipeDetailOut,
@@ -80,10 +71,7 @@ async def get_recipe_detail(recipe_id: int, db: AsyncSession = Depends(get_db)):
 )
 async def create_recipe(
     recipe_in: schemas.RecipeCreate, db: AsyncSession = Depends(get_db)
-):
-    """
-    Создает новый рецепт в кулинарной книге.
-    """
+) -> Any:
     new_recipe = models.Recipe(**recipe_in.dict())
     db.add(new_recipe)
     await db.commit()
